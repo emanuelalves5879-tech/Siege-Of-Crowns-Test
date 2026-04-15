@@ -1,0 +1,899 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+	<Meta name="ExplicitAutoJoints">true</Meta>
+	<External>null</External>
+	<External>nil</External>
+	<Item class="Script" referent="RBXD0E8B8C743554EFDB693492AB3F9CFB6">
+		<Properties>
+			<ProtectedString name="Source"><![CDATA[-- ============================================
+-- CONFIGURAÇÃO DE COLISÃO
+-- Players, Mobs, Gladiators e Preview não colidem entre si
+-- ============================================
+
+local PhysicsService = game:GetService("PhysicsService")
+local Players = game:GetService("Players")
+
+-- Registra os grupos de colisão (API moderna)
+PhysicsService:RegisterCollisionGroup("Players")
+PhysicsService:RegisterCollisionGroup("Mobs")
+PhysicsService:RegisterCollisionGroup("Gladiators")
+PhysicsService:RegisterCollisionGroup("Preview")
+
+-- Players não colidem com Mobs
+PhysicsService:CollisionGroupSetCollidable("Players", "Mobs", false)
+
+-- Mobs não colidem entre si (incluindo corpos mortos durante DeathCleanup)
+PhysicsService:CollisionGroupSetCollidable("Mobs", "Mobs", false)
+
+-- Gladiators não colidem com Players nem Mobs
+PhysicsService:CollisionGroupSetCollidable("Gladiators", "Players", false)
+PhysicsService:CollisionGroupSetCollidable("Gladiators", "Mobs", false)
+
+-- Preview não colide com nada (é apenas visual)
+PhysicsService:CollisionGroupSetCollidable("Preview", "Players", false)
+PhysicsService:CollisionGroupSetCollidable("Preview", "Mobs", false)
+PhysicsService:CollisionGroupSetCollidable("Preview", "Gladiators", false)
+
+-- ============================================
+-- APLICA AOS PLAYERS
+-- ============================================
+local function aplicarColisaoPlayer(character)
+	for _, part in character:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CollisionGroup = "Players"
+		end
+	end
+	
+	-- Aplica também a futuras partes adicionadas
+	character.DescendantAdded:Connect(function(descendant)
+		if descendant:IsA("BasePart") then
+			descendant.CollisionGroup = "Players"
+		end
+	end)
+end
+
+-- Players que já estão no jogo
+for _, player in Players:GetPlayers() do
+	if player.Character then
+		aplicarColisaoPlayer(player.Character)
+	end
+end
+
+-- Novos players que entrarem
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(aplicarColisaoPlayer)
+end)
+
+-- ============================================
+-- APLICA AOS GLADIADORES
+-- ============================================
+local function aplicarColisaoGladiator(model)
+	-- Desativa pulo automático e define JumpHeight como 0
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.AutoJumpEnabled = false
+		humanoid.JumpHeight = 0
+		humanoid.JumpPower = 0
+		humanoid.AutoRotate = false
+		humanoid.PlatformStand = true -- Desativa controle de movimento do Humanoid
+	end
+	
+	-- Aplica grupo de colisão a todas as partes
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CollisionGroup = "Gladiators"
+		end
+	end
+	
+	-- Aplica também a futuras partes adicionadas
+	model.DescendantAdded:Connect(function(descendant)
+		if descendant:IsA("BasePart") then
+			descendant.CollisionGroup = "Gladiators"
+		end
+	end)
+end
+
+-- Gladiadores existentes no Workspace
+for _, obj in workspace:GetChildren() do
+	if obj:IsA("Model") and obj.Name == "Gladiator" then
+		aplicarColisaoGladiator(obj)
+	end
+end
+
+-- Monitora novos gladiadores adicionados ao Workspace
+workspace.DescendantAdded:Connect(function(descendant)
+	if descendant:IsA("Model") and descendant.Name == "Gladiator" then
+		task.wait(0.1) -- Pequeno delay para garantir que o modelo está carregado
+		aplicarColisaoGladiator(descendant)
+	end
+end)]]></ProtectedString>
+			<bool name="Disabled">false</bool>
+			<Content name="LinkedSource"><null></null></Content>
+			<token name="RunContext">0</token>
+			<string name="ScriptGuid">{74E7A686-F77E-4863-A0C0-CF9B879A026B}</string>
+			<BinaryString name="AttributesSerialize"></BinaryString>
+			<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+			<bool name="DefinesCapabilities">false</bool>
+			<string name="Name">CollisionConfig</string>
+			<int64 name="SourceAssetId">-1</int64>
+			<BinaryString name="Tags"></BinaryString>
+		</Properties>
+	</Item>
+	<Item class="Script" referent="RBX2187AF50A713432AB02CADD7F0F7DBCE">
+		<Properties>
+			<ProtectedString name="Source"><![CDATA[local PhysicsService = game:GetService("PhysicsService")
+local Players = game:GetService("Players")
+
+-- Criar grupos de colisão
+local GLADIATOR_GROUP = "Gladiators"
+local PLAYER_GROUP = "Players"
+local PREVIEW_GROUP = "Preview"
+
+-- Criar os grupos de colisão
+PhysicsService:CreateCollisionGroup(GLADIATOR_GROUP)
+PhysicsService:CreateCollisionGroup(PLAYER_GROUP)
+PhysicsService:CreateCollisionGroup(PREVIEW_GROUP)
+
+-- Configurar para que gladiadores e jogadores NÃO colidam entre si
+PhysicsService:CollisionGroupSetCollidable(GLADIATOR_GROUP, PLAYER_GROUP, false)
+PhysicsService:CollisionGroupSetCollidable(PLAYER_GROUP, GLADIATOR_GROUP, false)
+
+-- Configurar para que o preview NÃO colida com gladiadores nem jogadores
+PhysicsService:CollisionGroupSetCollidable(PREVIEW_GROUP, GLADIATOR_GROUP, false)
+PhysicsService:CollisionGroupSetCollidable(GLADIATOR_GROUP, PREVIEW_GROUP, false)
+PhysicsService:CollisionGroupSetCollidable(PREVIEW_GROUP, PLAYER_GROUP, false)
+PhysicsService:CollisionGroupSetCollidable(PLAYER_GROUP, PREVIEW_GROUP, false)
+
+-- Função para aplicar o grupo de colisão a todas as partes de um modelo
+local function setCollisionGroupForModel(model, groupName)
+	for _, descendant in ipairs(model:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			PhysicsService:SetPartCollisionGroup(descendant, groupName)
+		end
+	end
+end
+
+-- Aplicar grupo de colisão ao gladiador existente no Workspace
+local function setupGladiator()
+	local gladiator = workspace:FindFirstChild("Gladiator")
+	if gladiator then
+		setCollisionGroupForModel(gladiator, GLADIATOR_GROUP)
+		-- Desativa pulo automático para evitar que o gladiador pule quando o jogador chega perto
+		local humanoid = gladiator:FindFirstChild("Humanoid")
+		if humanoid then
+			humanoid.AutoJumpEnabled = false
+		end
+		print("[GladiatorCollision] Grupo de colisão aplicado ao gladiador")
+	end
+end
+
+-- Aplicar grupo de colisão ao personagem do jogador
+local function setupPlayerCharacter(character)
+	setCollisionGroupForModel(character, PLAYER_GROUP)
+end
+
+-- Configurar gladiador existente
+setupGladiator()
+
+-- Monitorar novos gladiadores adicionados ao Workspace
+workspace.DescendantAdded:Connect(function(descendant)
+	if descendant:IsA("Model") and string.find(descendant.Name, "Gladiator") then
+		task.wait(0.1) -- Pequeno delay para garantir que o modelo está totalmente carregado
+		setCollisionGroupForModel(descendant, GLADIATOR_GROUP)
+		-- Desativa pulo automático
+		local humanoid = descendant:FindFirstChild("Humanoid")
+		if humanoid then
+			humanoid.AutoJumpEnabled = false
+		end
+		print("[GladiatorCollision] Novo gladiador detectado e configurado:", descendant.Name)
+	end
+end)
+
+-- Configurar jogadores existentes
+for _, player in ipairs(Players:GetPlayers()) do
+	if player.Character then
+		setupPlayerCharacter(player.Character)
+	end
+	player.CharacterAdded:Connect(setupPlayerCharacter)
+end
+
+-- Configurar novos jogadores que entrarem
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(setupPlayerCharacter)
+end)]]></ProtectedString>
+			<bool name="Disabled">false</bool>
+			<Content name="LinkedSource"><null></null></Content>
+			<token name="RunContext">0</token>
+			<string name="ScriptGuid">{236C1DF5-353E-4003-BB29-10A9BAE8EAB7}</string>
+			<BinaryString name="AttributesSerialize"></BinaryString>
+			<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+			<bool name="DefinesCapabilities">false</bool>
+			<string name="Name">GladiatorCollisionSetup</string>
+			<int64 name="SourceAssetId">-1</int64>
+			<BinaryString name="Tags"></BinaryString>
+		</Properties>
+	</Item>
+	<Item class="Script" referent="RBX52D6BD60CD724067A5980F06568F30E7">
+		<Properties>
+			<ProtectedString name="Source"><![CDATA[-- ============================================
+-- SCRIPT PRINCIPAL: Controla as ondas de zumbis
+-- ============================================
+
+-- Carrega o módulo que gerencia os zumbis
+local zumbi = require(script.Mob)
+
+-- Referência ao mapa do jogo
+local mapa = workspace:WaitForChild("cenario")
+
+-- Espera o mapa estar completamente carregado
+task.wait(2)
+
+-- Verifica se o mapa tem os waypoints necessários
+local waypoints = mapa:FindFirstChild("waypoints")
+local start = mapa:FindFirstChild("Start")
+
+if not waypoints then
+	warn("ERRO: waypoints não encontrado no mapa!")
+	return
+end
+
+if not start then
+	warn("ERRO: Start não encontrado no mapa!")
+	return
+end
+
+print("=== MAPA PRONTO! Iniciando ondas... ===")
+
+-- ============================================
+-- LOOP PRINCIPAL: 7 ondas de zumbis
+-- ============================================
+for onda = 1, 7 do
+	print("=== ONDA", onda, "INICIANDO ===")
+	
+	-- Calcula quantos zumbis e qual velocidade para esta onda
+	local quantidade, velocidade = zumbi.CalcularOnda(onda)
+	
+	-- Calcula multiplicador de HP do Dark Skeleton (a partir da onda 4: +5 HP por onda)
+	local skeletonVidaMult = zumbi.CalcularSkeletonHP(onda)
+	
+	print("Spawning: " .. quantidade .. " zumbis com " .. (velocidade * 100) .. "% de velocidade" .. (skeletonVidaMult > 1 and " e " .. string.format("%.0f", 30 * skeletonVidaMult) .. " HP" or ""))
+	
+	-- Spawna a onda de Dark Skeletons
+	zumbi.SpawnWave("Dark Skeleton", mapa, quantidade, velocidade, skeletonVidaMult)
+	
+	-- A partir da onda 4, spawna Golems também
+	if onda >= 4 then
+		-- Tempo de espera entre Dark Skeletons e Golems: 2s (ondas 4-5), 1.75s (onda 6+)
+		local tempoEspera = onda >= 6 and 1.75 or 2
+		task.wait(tempoEspera)
+		local golemQuantidade = onda - 3 -- Onda 4=1, Onda 5=2, Onda 6=3
+		
+		-- Calcula multiplicadores do Golem (+30% velocidade, +10% vida por onda)
+		local golemVelMult, golemVidaMult = zumbi.CalcularGolemStats(onda)
+		local golemVelocidade = velocidade * 0.5 * golemVelMult -- Base: metade do Dark Skeleton, depois +30% por onda
+		
+		print("Spawning: " .. golemQuantidade .. " Golems (Vel: " .. string.format("%.0f%%", golemVelMult * 100) .. ", Vida: " .. string.format("%.0f%%", golemVidaMult * 100) .. ")")
+		zumbi.SpawnWave("Golem", mapa, golemQuantidade, golemVelocidade, golemVidaMult)
+	end
+	
+	-- Espera todos os zumbis morrerem ou chegarem ao final
+	repeat
+		task.wait(1)
+	until zumbi.ContarVivos() == 0
+	
+	print("=== ONDA", onda, "FINALIZADA ===")
+	task.wait(2)  -- Pausa de 2 segundos entre ondas
+end
+
+print("=== TODAS AS ONDAS COMPLETAS! ===")]]></ProtectedString>
+			<bool name="Disabled">false</bool>
+			<Content name="LinkedSource"><null></null></Content>
+			<token name="RunContext">0</token>
+			<string name="ScriptGuid">{1954C16A-FFFE-49BF-948A-D344E105412E}</string>
+			<BinaryString name="AttributesSerialize"></BinaryString>
+			<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+			<bool name="DefinesCapabilities">false</bool>
+			<string name="Name">Main</string>
+			<int64 name="SourceAssetId">-1</int64>
+			<BinaryString name="Tags"></BinaryString>
+		</Properties>
+		<Item class="ModuleScript" referent="RBX8BC3729BE9AA4B8DAECD639E9646B894">
+			<Properties>
+				<Content name="LinkedSource"><null></null></Content>
+				<ProtectedString name="Source"><![CDATA[local ServerStorage = game:GetService("ServerStorage")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local PhysicsService = game:GetService("PhysicsService")
+
+-- Carrega o sistema de vida do castelo
+local Base = require(script.Parent.Base)
+
+local mob = {}
+
+-- ============================================
+-- CONFIGURAÇÕES (modifique aqui para ajustar o jogo)
+-- ============================================
+mob.Config = {
+	tempoEntreSpawns = 1.5,   -- Segundos entre cada esqueleto spawnar
+	velocidadeBase = 5,      -- Velocidade normal dos esqueletos
+	esqueletosOnda1 = 6,        -- Quantidade de esqueletos na primeira onda
+	aumentoPorOnda = 3,     -- Quantos zumbis a mais por onda
+	aumentoVelocidade = 0.3, -- Zumbis ficam 30% mais rápidos por onda
+	danoZumbi = 10,         -- Dano que o zumbi causa nas torres
+	intervaloAtaque = 1.0,   -- Intervalo entre ataques (segundos)
+}
+
+-- ============================================
+-- FUNÇÃO INTERNA: Move o zumbi pelo caminho
+-- ============================================
+local function moverZumbi(zumbi, mapa, dano)
+	-- Debug: Mostra qual mob está se movendo e o dano
+	local nomeMob = zumbi and zumbi.Name or "Desconhecido"
+	print(string.format("[Mob] %s iniciando movimento (dano: %d)", nomeMob, dano or 10))
+	
+	-- Proteção contra erros
+	local sucesso, erro = pcall(function()
+		local humanoide = zumbi:FindFirstChild("Humanoid")
+		local caminho = mapa:FindFirstChild("waypoints")
+		
+		-- Se não tem humanoide ou caminho, não faz nada
+		if not humanoide or not caminho then return end
+
+		-- Pega todos os pontos do caminho e ordena (1, 2, 3...)
+		-- Filtra apenas partes com nomes numéricos
+		local pontos = {}
+		for _, filho in caminho:GetChildren() do
+			if tonumber(filho.Name) then
+				table.insert(pontos, filho)
+			end
+		end
+		table.sort(pontos, function(a, b) 
+			return tonumber(a.Name) < tonumber(b.Name) 
+		end)
+
+		-- Move o zumbi de ponto em ponto
+		for i, ponto in pontos do
+			-- Verifica se o zumbi ainda existe e está vivo
+			if not zumbi or not zumbi.Parent then return end
+			if not humanoide or humanoide.Health <= 0 then return end
+			
+			if ponto:IsA("BasePart") then
+				humanoide:MoveTo(ponto.Position)
+				humanoide.MoveToFinished:Wait(10)
+				
+				-- Verifica se chegou perto o suficiente do último waypoint
+				local raiz = zumbi:FindFirstChild("HumanoidRootPart")
+				local ehUltimoPonto = (i == #pontos)
+				local distancia = raiz and (raiz.Position - ponto.Position).Magnitude or 0
+				
+				-- Se é o último ponto, espera até chegar perto o suficiente
+				if ehUltimoPonto then
+					local timeoutMaximo = 30 -- Tempo máximo de espera (30 segundos)
+					local tempoInicio = tick()
+					
+					-- Espera até estar perto o suficiente (ou timeout)
+					while distancia >= 5 and zumbi and zumbi.Parent and humanoide and humanoide.Health > 0 do
+						if tick() - tempoInicio > timeoutMaximo then
+							print(string.format("[Mob] %s timeout no último waypoint, forçando dano", nomeMob))
+							break
+						end
+						task.wait(0.5)
+						distancia = raiz and (raiz.Position - ponto.Position).Magnitude or 0
+					end
+					
+					-- Causa dano ao castelo
+					print(string.format("[Mob] %s chegou ao final! Causando %d de dano", nomeMob, dano or 10))
+					Base.TakeDamage(dano or 10)
+					if zumbi and zumbi.Parent then
+						zumbi:Destroy()
+					end
+					return
+				end
+			end
+		end
+		
+		-- Fallback: se completou todos os pontos mas não chegou perto do último
+		if zumbi and zumbi.Parent then
+			zumbi:Destroy()
+		end
+	end)
+	
+	-- Log de erros para debug
+	if not sucesso then
+		warn("Erro no moverZumbi: " .. tostring(erro))
+	end
+end
+
+-- ============================================
+-- FUNÇÃO: Spawna UM zumbi
+-- ============================================
+function mob.Spawn(nome, mapa, multiplicadorVelocidade, multiplicadorVida)
+	-- 1. Encontra o modelo do zumbi no ServerStorage
+	local pasta = ServerStorage:FindFirstChild("Mobs")
+	local modelo = pasta and pasta:FindFirstChild(nome)
+	if not modelo then return end  -- Se não encontrou, sai da função
+
+	-- 2. Cria uma cópia do zumbi
+	local zumbi = modelo:Clone()
+
+	-- 3. Posiciona no ponto de início do mapa
+	local inicio = mapa:FindFirstChild("Start")
+	local raiz = zumbi:FindFirstChild("HumanoidRootPart")  -- Parte que controla posição
+	
+	if inicio and raiz then
+		raiz.CFrame = inicio.CFrame
+	end
+
+	-- 3.5 Define a velocidade ANTES de colocar no Workspace (primeira definição)
+	local humanoide = zumbi:FindFirstChild("Humanoid")
+	local velocidadeFinal = mob.Config.velocidadeBase * (multiplicadorVelocidade or 1)
+	
+	-- Aplica multiplicador de vida (se fornecido)
+	local vidaFinal = humanoide and humanoide.MaxHealth * (multiplicadorVida or 1) or nil
+	
+	if humanoide then
+		humanoide.WalkSpeed = velocidadeFinal
+		if multiplicadorVida and multiplicadorVida ~= 1 then
+			humanoide.MaxHealth = vidaFinal
+			humanoide.Health = vidaFinal
+		end
+	end
+
+	-- 4. Aplica grupo de colisão (não colide com players)
+	for _, part in zumbi:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CollisionGroup = "Mobs"
+			-- Garante que partes móveis não estejam ancoradas
+			part.Anchored = false
+			-- Configura propriedades de física para movimento suave
+			part.CanCollide = true
+			part.Massless = false
+		end
+	end
+
+	-- 5. Garante que o modelo tem PrimaryPart definido
+	if not zumbi.PrimaryPart then
+		zumbi.PrimaryPart = raiz
+	end
+
+	-- 6. Coloca no mundo PRIMEIRO (necessário para Network Ownership)
+	zumbi.Parent = workspace
+
+	-- 7. Network Ownership: NPCs devem ser controlados pelo servidor
+	-- Isso garante movimento consistente e evita exploits
+	-- IMPORTANTE: Só pode ser chamado depois que o modelo está no Workspace
+	for _, part in zumbi:GetDescendants() do
+		if part:IsA("BasePart") then
+			part:SetNetworkOwner(nil)  -- nil = servidor tem controle
+		end
+	end
+
+	-- 8. Redefine a velocidade DEPOIS de colocar no Workspace (garante valor correto)
+	-- Isso evita que o Humanoid reinicialize a velocidade para o padrão
+	if humanoide then
+		humanoide.WalkSpeed = velocidadeFinal
+	end
+
+	-- 9. Define o dano baseado no tipo de mob
+	local dano = 10  -- Padrão: Dark Skeleton
+	if nome == "Golem" then
+		dano = 30  -- Golem causa 30 de dano
+	end
+	
+	print(string.format("[Spawn] %s spawnado (dano: %d, velocidade: %.1f)", nome, dano, velocidadeFinal))
+	
+	-- 10. Começa a andar
+	task.spawn(moverZumbi, zumbi, mapa, dano)
+end
+
+-- ============================================
+-- FUNÇÃO: Spawna VÁRIOS zumbis (uma onda)
+-- ============================================
+function mob.SpawnWave(nome, mapa, quantidade, multiplicadorVelocidade, multiplicadorVida)
+	for i = 1, quantidade do
+		-- Espera ANTES de spawnar (exceto o primeiro)
+		if i > 1 then
+			task.wait(mob.Config.tempoEntreSpawns)
+		end
+		mob.Spawn(nome, mapa, multiplicadorVelocidade, multiplicadorVida)
+	end
+end
+
+-- ============================================
+-- FUNÇÃO: Calcula quantos zumbis e qual velocidade para cada onda
+-- ============================================
+function mob.CalcularOnda(numeroOnda)
+	-- Fórmula: zumbis base + (onda - 1) * aumento por onda
+	local quantidade = mob.Config.esqueletosOnda1 + (numeroOnda - 1) * mob.Config.aumentoPorOnda
+	
+	-- Fórmula: 1 + (onda - 1) * aumento de velocidade
+	local velocidade = 1 + (numeroOnda - 1) * mob.Config.aumentoVelocidade
+	
+	return quantidade, velocidade
+end
+
+-- ============================================
+-- FUNÇÃO: Calcula multiplicador de HP do Dark Skeleton por onda
+-- A partir da onda 4: +5 HP por onda
+-- ============================================
+function mob.CalcularSkeletonHP(numeroOnda)
+	-- HP base do Dark Skeleton
+	local hpBase = 30
+	
+	-- Antes da onda 4: sem bônus
+	if numeroOnda < 4 then
+		return 1
+	end
+	
+	-- A partir da onda 4: +5 HP por onda
+	-- Onda 4: +5 HP, Onda 5: +10 HP, Onda 6: +15 HP
+	local bonusHP = (numeroOnda - 3) * 5
+	local multiplicador = (hpBase + bonusHP) / hpBase
+	
+	return multiplicador
+end
+
+-- ============================================
+-- FUNÇÃO: Calcula multiplicadores do Golem por onda
+-- Velocidade: FIXA (não aumenta)
+-- Vida: +10% por onda (começando da onda 4)
+-- ============================================
+function mob.CalcularGolemStats(numeroOnda)
+	if numeroOnda < 4 then
+		return 1, 1 -- Sem bônus antes da onda 4
+	end
+	
+	-- Calcula quantas ondas se passaram desde a onda 4
+	local ondasDesdeInicio = numeroOnda - 4
+	
+	-- Velocidade: FIXA (sem aumento por onda)
+	local multiplicadorVelocidade = 1
+	
+	-- Vida: 1.1^ondasDesdeInicio (10% por onda)
+	local multiplicadorVida = 1.1 ^ ondasDesdeInicio
+	
+	return multiplicadorVelocidade, multiplicadorVida
+end
+
+-- ============================================
+-- FUNÇÃO: Conta quantos zumbis estão vivos
+-- (exclui jogadores e torres, conta apenas inimigos)
+-- ============================================
+function mob.ContarVivos()
+	local contador = 0
+	local mobsVivos = {}
+	
+	for _, objeto in workspace:GetChildren() do
+		local humanoide = objeto:FindFirstChild("Humanoid")
+		local naoEhJogador = not Players:GetPlayerFromCharacter(objeto)
+		local naoEhTorre = not objeto:FindFirstChild("GladiatorScript")
+		
+		-- Só conta se: tem Humanoid, não é jogador, não é torre, e está VIVO
+		if humanoide and naoEhJogador and naoEhTorre and humanoide.Health > 0 then
+			contador += 1
+			table.insert(mobsVivos, objeto.Name)
+		end
+	end
+	
+	-- Debug: mostra quais mobs estão vivos
+	if contador > 0 then
+		print(string.format("[ContarVivos] %d mobs vivos: %s", contador, table.concat(mobsVivos, ", ")))
+	end
+	
+	return contador
+end
+
+return mob]]></ProtectedString>
+				<string name="ScriptGuid">{4BD73413-FE50-4D50-A642-AF225A718C0D}</string>
+				<BinaryString name="AttributesSerialize"></BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">Mob</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
+		</Item>
+		<Item class="Script" referent="RBX0369DB2EF1E54AF6A84E9E0AE4462FEE">
+			<Properties>
+				<ProtectedString name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Referência ao RemoteEvent
+local placeTowerEvent = ReplicatedStorage:WaitForChild("PlaceTower")
+
+-- Referência ao modelo da torre Gladiator
+local gladiatorModel = ReplicatedStorage:WaitForChild("Towers"):WaitForChild("Gladiator")
+local mapa = workspace:WaitForChild("cenario")
+
+-- Configurações
+local PATH_BLOCK_RADIUS = 4 -- Mesmo valor do cliente
+local MIN_PLAYER_DISTANCE = 4 -- Distância mínima do jogador
+local MIN_SPAWN_DISTANCE = 9 -- Distância mínima do spawn dos mobs
+local CASTLE_MARGIN = 2 -- Margem extra ao redor do castelo
+
+-- Calcula distância de um ponto a uma linha (segmento)
+local function distanceToSegment(point, lineStart, lineEnd)
+	local px, pz = point.X, point.Z
+	local x1, z1 = lineStart.X, lineStart.Z
+	local x2, z2 = lineEnd.X, lineEnd.Z
+	
+	local dx = x2 - x1
+	local dz = z2 - z1
+	
+	if dx == 0 and dz == 0 then
+		return math.sqrt((px - x1)^2 + (pz - z1)^2)
+	end
+	
+	local t = ((px - x1) * dx + (pz - z1) * dz) / (dx * dx + dz * dz)
+	t = math.clamp(t, 0, 1)
+	
+	local nearestX = x1 + t * dx
+	local nearestZ = z1 + t * dz
+	
+	return math.sqrt((px - nearestX)^2 + (pz - nearestZ)^2)
+end
+
+-- Verifica se posição está no caminho dos inimigos (mesma lógica do cliente)
+local function isOnPath(position)
+	local waypoints = mapa:FindFirstChild("waypoints")
+	if not waypoints then return false end
+	
+	-- Coleta e ordena waypoints
+	local pontos = {}
+	for _, wp in waypoints:GetChildren() do
+		if wp:IsA("BasePart") and tonumber(wp.Name) then
+			table.insert(pontos, {name = tonumber(wp.Name), pos = wp.Position})
+		end
+	end
+	table.sort(pontos, function(a, b) return a.name < b.name end)
+	
+	-- Adiciona o ponto de início (Start) no começo do caminho
+	local startPart = mapa:FindFirstChild("Start")
+	if startPart and startPart:IsA("BasePart") then
+		table.insert(pontos, 1, {name = 0, pos = startPart.Position})
+	end
+	
+	-- Verifica distância para cada waypoint
+	for _, ponto in pontos do
+		local dist2D = math.sqrt((position.X - ponto.pos.X)^2 + (position.Z - ponto.pos.Z)^2)
+		if dist2D < PATH_BLOCK_RADIUS then
+			return true
+		end
+	end
+	
+	-- Verifica distância para cada segmento do caminho
+	for i = 1, #pontos - 1 do
+		local dist = distanceToSegment(position, pontos[i].pos, pontos[i + 1].pos)
+		if dist < PATH_BLOCK_RADIUS then
+			return true
+		end
+	end
+	
+	return false
+end
+
+-- Verifica se está em cima do jogador
+local function isOnPlayer(player, position)
+	local character = player.Character
+	if not character then return false end
+	
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return false end
+	
+	local dist2D = math.sqrt((position.X - hrp.Position.X)^2 + (position.Z - hrp.Position.Z)^2)
+	return dist2D < MIN_PLAYER_DISTANCE
+end
+
+-- Verifica se está muito perto do spawn dos mobs
+local function isTooCloseToSpawn(position)
+	local startPart = mapa:FindFirstChild("Start")
+	if not startPart or not startPart:IsA("BasePart") then return false end
+	
+	local dist2D = math.sqrt((position.X - startPart.Position.X)^2 + (position.Z - startPart.Position.Z)^2)
+	return dist2D < MIN_SPAWN_DISTANCE
+end
+
+-- Verifica se está em cima do Castelo (Base)
+local function isOnCastle(position)
+	local cenario = mapa:FindFirstChild("Cenário")
+	if not cenario then return false end
+	
+	local castelo1 = cenario:FindFirstChild("Castelo1")
+	if not castelo1 then return false end
+	
+	local castelo = castelo1:FindFirstChild("Castelo")
+	if not castelo then return false end
+	
+	-- Pega o bounding box do castelo
+	local cframe, size = castelo:GetBoundingBox()
+	local pos = cframe.Position
+	
+	-- Verifica se a posição está dentro da área do castelo (com margem)
+	local halfSizeX = size.X / 2 + CASTLE_MARGIN
+	local halfSizeZ = size.Z / 2 + CASTLE_MARGIN
+	
+	local withinX = math.abs(position.X - pos.X) < halfSizeX
+	local withinZ = math.abs(position.Z - pos.Z) < halfSizeZ
+	
+	return withinX and withinZ
+end
+
+-- Função para configurar o gladiador após spawn
+local function configurarGladiator(model)
+	-- Configura o Humanoid para não pular e ficar estável
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.AutoJumpEnabled = false
+		humanoid.JumpHeight = 0
+		humanoid.JumpPower = 0
+		humanoid.AutoRotate = false
+		humanoid.PlatformStand = true -- Desativa controle de movimento do Humanoid
+		humanoid.HipHeight = 0 -- R6 usa as pernas para altura
+	end
+	
+	-- Ancora o HumanoidRootPart para não cair
+	local hrp = model:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		hrp.Anchored = true
+	end
+	
+	-- Aplica grupo de colisão a todas as partes
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CollisionGroup = "Gladiators"
+		end
+	end
+end
+
+-- Função para spawnar a torre
+local function spawnTower(player, towerName, position, rotation)
+	-- Verifica se a torre existe
+	local towerModel = ReplicatedStorage:FindFirstChild("Towers")
+	if not towerModel then return end
+	
+	local tower = towerModel:FindFirstChild(towerName)
+	if not tower then return end
+	
+	-- Verifica se posição está no caminho (segurança)
+	if isOnPath(position) then
+		print("Posição bloqueada: está no caminho dos inimigos")
+		return
+	end
+	
+	-- Verifica se está em cima do jogador (segurança)
+	if isOnPlayer(player, position) then
+		print("Posição bloqueada: está em cima do jogador")
+		return
+	end
+	
+	-- Verifica se está muito perto do spawn dos mobs
+	if isTooCloseToSpawn(position) then
+		print("Posição bloqueada: está muito perto do spawn dos mobs")
+		return
+	end
+	
+	-- Verifica se está em cima do castelo
+	if isOnCastle(position) then
+		print("Posição bloqueada: está em cima do castelo")
+		return
+	end
+	
+	-- Clona a torre
+	local newTower = tower:Clone()
+	
+	-- Posiciona a torre com rotação
+	local rotationRad = math.rad(rotation or 0)
+	newTower:PivotTo(CFrame.new(position) * CFrame.Angles(0, rotationRad, 0))
+	
+	-- Configura o gladiador (colisão e humanoid)
+	configurarGladiator(newTower)
+	
+	-- Coloca no Workspace
+	newTower.Parent = workspace
+	
+	print("Torre " .. towerName .. " spawnada para " .. player.Name .. " em " .. tostring(position) .. " com rotação " .. tostring(rotation) .. "°")
+end
+
+-- Conecta o evento
+placeTowerEvent.OnServerEvent:Connect(spawnTower)]]></ProtectedString>
+				<bool name="Disabled">false</bool>
+				<Content name="LinkedSource"><null></null></Content>
+				<token name="RunContext">0</token>
+				<string name="ScriptGuid">{AC5FD647-0DCA-4F3F-8371-4E2234A7BA6B}</string>
+				<BinaryString name="AttributesSerialize"></BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">TowerSpawner</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
+		</Item>
+		<Item class="ModuleScript" referent="RBX59670EC101C349D792BE2C20262E9F2C">
+			<Properties>
+				<Content name="LinkedSource"><null></null></Content>
+				<ProtectedString name="Source"><![CDATA[local module = {}
+
+-- Configurações do Castelo
+local CASTLE_MAX_HEALTH = 500
+local CASTLE_HEALTH = CASTLE_MAX_HEALTH
+
+-- Referências
+local castelo1 = game.Workspace.cenario["Cenário"].Castelo1
+local billboardGui = castelo1.BillboardGui
+local healthBar = billboardGui.Frame.Background.HealthBar
+local healthText = billboardGui.Frame.Background.HealthText
+local titleLabel = billboardGui.Frame.Background.TitleLabel
+
+-- Função para atualizar a barra de vida
+local function atualizarBarraVida()
+	local healthPercent = CASTLE_HEALTH / CASTLE_MAX_HEALTH
+	healthBar.Size = UDim2.new(healthPercent, -4, 0.35, -4)
+	
+	-- Se a vida chegou a 0, mostra "BASE: DESTROYED" centralizado
+	if CASTLE_HEALTH <= 0 then
+		-- Esconde a barra de vida
+		healthBar.Size = UDim2.new(0, 0, 0, 0)
+		healthBar.Visible = false
+		
+		-- Mostra texto centralizado "BASE: DESTROYED"
+		healthText.Text = "BASE: DESTROYED"
+		healthText.Size = UDim2.new(1, 0, 1, 0)
+		healthText.Position = UDim2.new(0, 0, 0, 0)
+		healthText.TextSize = 14
+		healthText.TextColor3 = Color3.fromRGB(255, 50, 50)
+		healthText.BackgroundTransparency = 1
+		healthText.TextStrokeTransparency = 0.5
+		
+		-- Esconde o título
+		titleLabel.Text = ""
+	else
+		healthText.Text = string.format("%d/%d", CASTLE_HEALTH, CASTLE_MAX_HEALTH)
+		titleLabel.Text = "Base"
+		titleLabel.TextSize = 14
+		titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	
+		-- Mudar cor baseado na vida
+		if healthPercent > 0.6 then
+			healthBar.BackgroundColor3 = Color3.fromRGB(50, 200, 50) -- Verde
+		elseif healthPercent > 0.3 then
+			healthBar.BackgroundColor3 = Color3.fromRGB(255, 200, 0) -- Amarelo
+		else
+			healthBar.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Vermelho
+		end
+	end
+end
+
+-- Função para causar dano ao castelo
+function module.TakeDamage(damage)
+	if CASTLE_HEALTH <= 0 then return end
+	
+	CASTLE_HEALTH = math.max(0, CASTLE_HEALTH - damage)
+	atualizarBarraVida()
+	
+	print(string.format("[Castelo] Recebeu %d de dano. Vida restante: %d/%d", damage, CASTLE_HEALTH, CASTLE_MAX_HEALTH))
+	
+	if CASTLE_HEALTH <= 0 then
+		print("[Castelo] DESTRUÍDO!")
+		-- Aqui você pode adicionar lógica de game over
+	end
+end
+
+-- Função para obter a vida atual
+function module.GetHealth()
+	return CASTLE_HEALTH, CASTLE_MAX_HEALTH
+end
+
+-- Inicializar barra de vida
+atualizarBarraVida()
+
+return module
+]]></ProtectedString>
+				<string name="ScriptGuid">{CCFD35D9-32A2-43A1-B799-D6D24E913307}</string>
+				<BinaryString name="AttributesSerialize"></BinaryString>
+				<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+				<bool name="DefinesCapabilities">false</bool>
+				<string name="Name">Base</string>
+				<int64 name="SourceAssetId">-1</int64>
+				<BinaryString name="Tags"></BinaryString>
+			</Properties>
+		</Item>
+	</Item>
+</roblox>
